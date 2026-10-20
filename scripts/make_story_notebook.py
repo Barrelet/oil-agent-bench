@@ -1,0 +1,149 @@
+"""Builds notebooks/oil_story.ipynb, the plain-language story, in the style of September's
+04_the_story.ipynb. Reads data/summary/ only; never calls a model.
+
+    python scripts/make_story_notebook.py           # real summary (after the runs)
+    python scripts/make_story_notebook.py --demo    # synthetic prices, stand-in players
+
+Text marked [TO WRITE] is filled in once the real numbers are in; each post adds its section.
+"""
+
+import argparse
+from pathlib import Path
+
+import nbformat as nbf
+
+ROOT = Path(__file__).resolve().parents[1]
+ap = argparse.ArgumentParser()
+ap.add_argument("--demo", action="store_true")
+args = ap.parse_args()
+
+nb = nbf.v4.new_notebook()
+cells = []
+md = lambda s: cells.append(nbf.v4.new_markdown_cell(s))      # noqa: E731
+code = lambda s: cells.append(nbf.v4.new_code_cell(s))        # noqa: E731
+
+md("""# Can an AI trade oil? I gave it a year of WTI to find out.
+
+*A plain-language walk through one experiment. No maths beyond percentages, no code you need to read: each short code cell just draws the next picture. The code is in the `oilbench/` folder; the September version, on US stocks, is at github.com/Barrelet/agent-alpha-bench.*
+
+**The question.** Public leaderboards such as Alpha Arena and TradeRank let AI models trade stocks and crypto and rank them by profit. In September I ran that game on US stocks. This time the market is crude oil, the contract every oil trader watches, over a full year replayed. Three kinds of player take a seat: a small AI language model on my laptop, a far larger one, and TimesFM, a model built to forecast numbers rather than read words.
+
+**The short answer.** The AI prompt moved the result more than the AI did. The same small model, the same year of oil, three prompts: −36%, −7%, +11%. The far bigger model made +35% with one of those prompts, almost entirely by trading less. The forecasting model lost −34.5%, betting all year that oil would fall back to its long-run average. No player could say whether oil would close higher tomorrow any better than a coin, and every year was decided by two or three trades.""")
+
+code("""import sys
+from pathlib import Path
+ROOT = Path.cwd().parent if Path.cwd().name == "notebooks" else Path.cwd()
+sys.path.insert(0, str(ROOT))
+from oilbench.report import *          # the pictures; everything is read from data/summary/
+S = load_summary(ROOT)
+have = lambda names: [n for n in names if n in set(S.players["player"])]
+SMALL = have(["Qwen3 8B, Prompt 1", "Qwen3 8B, Prompt 2", "Qwen3 8B, Prompt 3"])
+LARGE = have(["GPT-5.1, Prompt 1", "GPT-5.1, Prompt 2", "GPT-5.1, Prompt 3"])
+TSFM = have(["TimesFM 2.5"])
+BASE = ["Do nothing (cash)", "Hold oil all year"]
+if S.meta.get("demo"):
+    print("DEMO: synthetic prices and stand-in players. None of these numbers is a result.")
+print("The year:", S.window)""")
+
+md("""## 1. The game
+
+A small simulator plays an oil-trading game, and different players take turns at it. The rules follow the September game as closely as one market allows:
+
+- **$10,000 of pretend money**, one market: the front-month WTI crude oil future, for one year.
+- **One decision a day**, after the close, carried out at the next morning's opening price, so nobody can use a price they could not have known.
+- **Three choices only**: own oil with the whole account (*long*), bet against it with the whole account (*short*), or hold cash (*flat*). No borrowing.
+- **Every trade carries the same safety stop**, set by the simulator, not the player: three times oil's typical daily range from the entry price, never more than 15%. It closes the trade automatically in a violent move. Otherwise a player exits when it chooses. The stop protects the entry, not the profits: taking profits is the player's own decision.
+- **Every trade costs 0.02%**, about what a WTI futures trader pays in fees and slippage.
+- **Each day, every player also states the chance that oil closes higher tomorrow.** That number is scored on its own (section 6).
+
+Prices are the front-month WTI future as quoted, the price on any oil chart. Each month that contract expires and the quote moves to the next one; the small jump between the two (usually 0.5% to 2%) stays in the price, the same for every player. Removing it was tried and rejected: this year two of those days were large real market moves (−10% on 23 March, −9% on 20 May 2026), and setting them aside would have made holding oil look far better than it was.
+
+Every player sees the same information: the last few months of daily prices and a few simple statistics, plus its own account. No news, no inventory reports, no internet.""")
+
+md("""## 2. The players
+
+**The AI players.** Each day the model reads the day's prices and one of three sets of instructions, and decides for itself: own oil, bet against it, or hold cash. Nothing in the code makes the choice; the decision is the model's own judgement. The three sets of instructions:
+- **Prompt 1**, the basic brief: the rules only, no method.
+- **Prompt 2**, plus risk rules: the cost of changing position, stay in cash without a clear view.
+- **Prompt 3**, a structured brief: weigh trend, momentum and price level yourself; take a position when the evidence leans one way, and keep it while the reason holds.
+
+When a trade is open, the model is asked again every day whether to keep it, close it or reverse it. It also states each day its chance that oil closes higher tomorrow, but no level of that number forces a trade: the two answers are separate, and scored separately.
+
+**Two players that do nothing clever.** They tell us whether the AI did anything a simpler thing could not:
+- **Do nothing**: keep the $10,000 in cash.
+- **Hold oil all year**: buy on day one, sell on the last day.
+
+**And 1,000 coin-flippers**, the key to the experiment. Each plays by the same rules but decides everything at random: whether to trade today, long or short, when to get out. No information, no skill. A player that finishes ahead of most of them has shown something; one in the middle of the pack has shown nothing a coin would not.""")
+
+md("""## 3. The small model on oil (post 1)
+
+Here is the cumulative P&L of each account through the year, net of fees.""")
+code("""pnl_chart(S, SMALL + BASE);""")
+code("""scoreboard(S, SMALL + BASE)""")
+md("""Same model, same prices, same rules, three prompts: **−7.3%, −35.7% and +11.4%**. A 47-point spread, and the only thing that changed was the wording. With the basic prompt the model traded 109 times and shorted a rising market. With the risk rules it sat in cash on 130 days, including most of the big up days. With the structured prompt it behaved like a trend follower: long from February, short from June.
+
+Here is every trade behind the best of the three results. Two trades made all its money: a long from 19 February to 3 June and a short from 12 June to 2 July. The other 28 netted a loss.""")
+code("""best = max(SMALL, key=lambda p: S.value(p, "total_return")) if SMALL else None
+if best: trades_chart(S, best);""")
+md("""And here is where each one lands among 1,000 coin-flippers playing the same year by the same rules.""")
+code("""luck_chart(S, SMALL + BASE);""")
+md("""The best prompt finished ahead of 70 of 100 coin-flippers; the worst, ahead of 27. Doing nothing sits at 61, because most coin-flippers lost money to fees and bad timing in a volatile year. The take-home of post 1: when an AI trades, you are not testing a model, you are testing a prompt. A leaderboard that shows "model X made money" is showing one prompt's result.""")
+
+md("""## 4. Is it because the model is small? (post 2)
+
+The obvious objection: a model that fits on a laptop is not what the leaderboards run. So the same three prompts, the same year and the same information went to GPT-5.1.""")
+code("""if LARGE: pnl_chart(S, LARGE + BASE, "GPT-5.1: cumulative P&L, USD");""")
+code("""scoreboard(S, LARGE + SMALL + BASE) if LARGE else "GPT-5.1 not run yet\"""")
+code("""if LARGE: luck_chart(S, LARGE + BASE);""")
+md("""GPT-5.1: **+14.1%, +35.2% and −0.1%**, against the small model's −7.3%, −35.7% and +11.4% on the same three prompts. The whole year of API calls cost $4.
+
+What it did differently was mostly nothing. Eleven to twenty-six trades in the year against about a hundred, cash on about 40% of days with the first two prompts, and in every run a couple of trades carried the result. On its best run, the risk-rules prompt, those were one long through the March rally and one short through the June fall. Its edge over the small model was patience, not insight: it did not see more, it sat out more.
+
+Two things stand out. The best prompt for one model was the worst for the other: the risk rules that sank the small model (−35.7%) were GPT-5.1's best (+35.2%), and the structured prompt that saved the small model (+11.4%) left GPT-5.1 at break-even. There is no prompt you can carry from one model to the next. And GPT-5.1's written reasoning reads like a trader's note, citing the trend, the averages, RSI, a thesis "invalidated"; the small model's notes read almost as well and lost money. A convincing note is not a result.""")
+
+md("""## 5. A model built for numbers (post 3)
+
+Language models read prices as text. TimesFM 2.5, a forecasting model from Google Research, was trained on numbers: it takes a price history and returns a forecast with a range around it. It does not trade, so it plays through a fixed rule written down before any result was seen: own oil if its forecast for tomorrow is more than 0.04% above today's close (the cost of a round trip), bet against it if more than 0.04% below, otherwise hold cash. The same safety stop as everyone else.
+
+Before the test year, the previous year chose its settings: prices or daily returns, and three months to ten years of history, twelve versions in all, scored on forecast accuracy only, never on profit. None beat always saying 50% by a meaningful margin, so Google's default stayed: prices, four years of history.""")
+code("""if TSFM: pnl_chart(S, TSFM + BASE, "TimesFM 2.5: cumulative P&L, USD");""")
+code("""scoreboard(S, TSFM + LARGE + SMALL + BASE) if TSFM else "TimesFM not run yet\"""")
+code("""if TSFM: luck_chart(S, TSFM + BASE);""")
+md("""**−34.5%**, ahead of 28 of 100 coin-flippers. It was short on 175 of 250 days.
+
+Why: its forecasts tracked the distance between today's price and the average of the last four years, about $78. Above that level it predicted a fall on 94% of days, in a year oil spent half its days above it. TimesFM on a daily price series is not a forecaster; it is a mean-reversion bet, and the length of history you feed it decides which average it reverts to, and so which trade it makes. The best of the twelve versions, played once as a check, lost 61%.""")
+
+md("""## 6. Did the stated chances mean anything?
+
+Every day, every player said how likely it was that oil would close higher the next day. In September the chances were tied to a rule (no trade below 80%), and both models simply wrote the smallest number the rule accepted. This time the number is asked for on its own, with no rule attached, and scored: a player whose 70% days rise about 70% of the time knows something; one whose chances never move, or do not match what happens, does not.""")
+code("""calibration_chart(S, SMALL + LARGE + TSFM);""")
+code("""S.players.set_index("player").loc[SMALL + LARGE + TSFM, ["n_forecasts", "mean_p_up", "distinct_values", "hit_rate", "brier", "brier_no_view", "brier_skill"]].round(3)""")
+md("""A Brier skill above zero means the chances beat always saying 50%. Nobody managed it. Six of the seven players scored below zero; GPT-5.1 with the first prompt scored +0.010, a hair above a coin, with its direction right on 55% of days. Too small to call skill. The small model used only nine to eleven distinct values all year, mostly 0.35, 0.45, 0.65 and 0.75, and its 65% days rose no more often than its 45% days.
+
+So the trades carried a view, and the forecasts carried nothing. Whatever these players made, they did not make it by knowing where oil would close tomorrow.""")
+
+md("""## 7. What this does and does not show
+
+**What it shows.** Four things, across seven AI players and a year of oil:
+1. **The prompt mattered more than the model.** Same model, 47 points of spread from the wording; and the best prompt for one model was the worst for the other.
+2. **The bigger model's edge was patience.** GPT-5.1 won by trading a fraction as often, not by seeing more.
+3. **No player could call the next day.** Every stated chance of a rise was a coin or worse.
+4. **Two or three trades decided every year.** Every profitable run was long through the March rally; much of what was made was given back in the choppy months after.
+
+**What it does not show.** One year, one market, prices only. Enough to rule out "clearly better than a coin"; not enough to rule out a small edge, and nothing here applies to a model given news, inventories or other information traders use.
+
+---
+
+### Glossary
+
+**Long / short / flat.** Long makes money if oil rises; short makes money if it falls; flat is cash.
+**Safety stop (disaster stop).** A price fixed by the game when a trade opens, at which the trade is closed automatically. Wide on purpose: a safety net, rarely the reason a trade ends.
+**Front-month future.** The oil contract closest to expiry, the one most traded and quoted.
+**Coin-flipper (random trader).** A player that makes every choice at random under the same rules: the measure of what luck alone produces.
+**Brier score.** The average squared gap between a stated chance and what happened (1 or 0). Always saying 50% scores 0.25; lower is better.""")
+
+nb["cells"] = cells
+out = ROOT / "notebooks" / ("oil_story_demo.ipynb" if args.demo else "oil_story.ipynb")
+out.parent.mkdir(exist_ok=True)
+nbf.write(nb, out)
+print("wrote", out)

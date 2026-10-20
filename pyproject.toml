@@ -1,0 +1,14 @@
+[project]
+name = "oilbench"
+version = "0.1.0"
+description = "LLMs and TimesFM trading one year of WTI under September's agent-alpha-bench rules"
+requires-python = ">=3.10"
+dependencies = ["pandas>=2.2", "numpy>=1.26", "pydantic>=2.6", "requests>=2.31", "matplotlib>=3.8", "yfinance>=0.2.50"]
+
+[project.optional-dependencies]
+timesfm = ["timesfm[torch]==3.0.2"]
+dev = ["pytest", "jupyter", "nbformat"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

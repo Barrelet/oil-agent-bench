@@ -1,0 +1,25 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.DS_Store
+# secrets
+local_settings.py
+.env
+.env.*
+# prices are consumed from Yahoo Finance, never republished
+data/wti_daily.csv
+data/*.parquet
+# raw model answers and per-run logs stay local; the published summary goes in data/summary/
+data/llm_cache/
+data/results/
+data/results_quick/
+data/summary_quick/
+# earlier runs under earlier rules, kept locally for the record
+data/archive_*/
+# LinkedIn post drafts and images stay out of the repository
+posts/
+*.docx
+
+# internal design log, kept local
+BLUEPRINT.md

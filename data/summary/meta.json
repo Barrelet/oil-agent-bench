@@ -1,0 +1,10 @@
+{
+  "first_decision": "2025-10-01",
+  "first_fill": "2025-10-02",
+  "last_mark": "2026-09-30",
+  "days": 250,
+  "model": "gpt-5.1",
+  "reasoning_effort": "low",
+  "quick_look": false,
+  "run_date": "2026-10-20"
+}

@@ -84,4 +84,12 @@ pytest                             # 36 checks, about 40 seconds
 
 Notebook 02 needs [Ollama](https://ollama.com) with `qwen3:8b` pulled. Notebook 03 needs an OpenAI key in `local_settings.py` (`OPENAI_API_KEY = "sk-..."`), which is gitignored; GPT-5.1 is deprecated by OpenAI with shutdown on 1 April 2027, and because OpenAI fixes its temperature a fresh run can differ from the one reported here. Every model answer is cached on disk, so a run can be stopped and resumed, and the reported runs replay exactly from the cache.
 
-Prices are the front-month WTI future as quoted (Yahoo CL=F), downloaded at run time with no adjustment for contract rolls (see `oilbench/data.py`); they are not redistributed here. TimesFM 2.5 (Google Research, Apache-2.0) is downloaded from Hugging Face at run time; it is not an official Google product and this project is not endorsed by Google. Qwen3 is released under Apache-2.0. Not investment advice.
+Prices are the front-month WTI future as quoted (Yahoo CL=F), downloaded at run time with no adjustment for contract rolls (see `oilbench/data.py`). TimesFM 2.5 is downloaded from Hugging Face at run time.
+
+## Disclaimer
+
+This is a research experiment on a paper account. All results are simulated on historical prices and are hypothetical: no money was traded, and nothing here is investment advice, a recommendation, or an offer to trade any instrument. Past or simulated performance says nothing about future results. The code and data are provided as they are, without warranty of any kind.
+
+Prices come from Yahoo Finance under its terms of use and are not redistributed in this repository. GPT-5.1 was accessed through OpenAI's API under OpenAI's terms. Qwen3 is released by Alibaba Cloud under the Apache-2.0 licence. TimesFM 2.5 is released by Google Research under the Apache-2.0 licence; it is not an official Google product. This project is independent of and not endorsed by OpenAI, Alibaba, Google, Alpha Arena or TradeRank. Product and model names are the trademarks of their owners.
+
+Code in this repository: MIT licence, see `LICENSE`.
